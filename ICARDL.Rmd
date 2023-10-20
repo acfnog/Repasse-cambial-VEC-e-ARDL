@@ -1,0 +1,76 @@
+```{r}
+setwd('C:/Users/anafe/OneDrive/Área de Trabalho/UNESP/IC/Pesquisa2023')
+library(urca)
+library(lmtest)
+library(sandwich)
+library(mFilter)
+library(tstools)
+library(ARDL)
+library(readxl)
+library(car)
+```
+
+```{r}
+dados <- read_excel("C:/Users/anafe/OneDrive/Área de Trabalho/UNESP/IC/Pesquisa2023/dados_uso.xlsx")
+dados<-dados[,c('pib', 'coef_abertura', 'ipca', 'ipca_aliemntos', 'icbragro', 'ipa_agro', 'petroleo', 'e', 'indicefmi')]
+dados_ts<- as.ts(dados, start = c(1999, 1), end = c(2023, 4), frequency = 12)
+pib <- log(dados[,c('pib')])
+pibhp<-hpfilter(pib,freq=12,type=c("frequency"),drift=FALSE)
+pibciclo <- pibhp$cycle
+ciclodf<-as.data.frame(pibciclo)
+dados['pibciclo'] <- ciclodf
+dados_ts2 <-as.ts(dados, start = c(1999, 1), end = c(2023, 4), frequency = 12)
+dados_ts2[, 'coef_abertura'] = log(dados_ts2[, 'coef_abertura'])
+dados_ts2[, 'ipca'] = log(dados_ts2[, 'ipca'])
+dados_ts2[, 'icbragro'] = log(dados_ts2[, 'icbragro'])
+dados_ts2[, 'ipa_agro'] = log(dados_ts2[, 'ipa_agro'])
+dados_ts2[, 'petroleo'] = log(dados_ts2[, 'petroleo'])
+dados_ts2[, 'e'] = log(dados_ts2[, 'e'])
+dados_ts2[, 'indicefmi'] = log(dados_ts2[, 'indicefmi'])
+dados_ts2 <- dados_ts2[,c('coef_abertura', 'ipca', 'ipca_aliemntos', 'icbragro', 'ipa_agro', 'petroleo', 'e', 'indicefmi', 'pibciclo')]
+ipca <- dados_ts2[, 'ipca']
+ipca <- diff(ipca)
+ipcavar<-as.data.frame(ipca)
+dados_ts2 = dados_ts2[- 1, ]
+dados_ts2 <- cbind(ipcavar, dados_ts2)
+colnames(dados_ts2)[colnames(dados_ts2)=='x']<-'ipcavar'
+dados_ts2 <- dados_ts2[,c('coef_abertura', 'ipca_aliemntos', 'icbragro', 'ipa_agro', 'petroleo', 'e', 'indicefmi', 'pibciclo', 'ipcavar')]
+dados2_ts<- as.ts(dados_ts2, start = c(1999, 2), end = c(2023, 4), frequency = 12)
+```
+
+```{r}
+#Equação IPCA
+dadosIPCA <- dados2_ts[,c('ipcavar', 'coef_abertura','indicefmi', 'petroleo', 'e', 'icbragro', 'pibciclo')]
+dadosIPCA_ts <- as.ts(dadosIPCA, start = c(1999, 2), end = c(2023, 4), frequency = 12)
+#Equação IPCA alimentos
+dadosAlimentos <- dados2_ts[,c('ipca_aliemntos', 'coef_abertura', 'indicefmi', 'petroleo', 'e','icbragro', 'pibciclo')]
+dadosAlimentos_ts <- as.ts(dadosAlimentos, start = c(1999, 2), end = c(2023, 4), frequency = 12)
+#Equação IPA agrícola
+dadosIPA <- dados2_ts[,c('ipa_agro','coef_abertura', 'indicefmi', 'petroleo','e', 'icbragro', 'pibciclo')]
+dadosIPA_ts <- as.ts(dadosIPA, start = c(1999, 2), end = c(2023, 4), frequency = 12)
+```
+
+
+```{r}
+#ARDL IPCA
+modeloARDL1 <- ardl(ipcavar ~ coef_abertura + indicefmi + petroleo + e + icbragro + pibciclo, data = dadosIPCA_ts, order = c(5,5,5,5,5,5,5))
+#summary(modeloARDL1)
+coef(modeloARDL1)
+ipcavar_L <- 1-sum(modeloARDL1$coefficients[2:6])
+e_L <- sum(modeloARDL1$coefficients[25:30])
+```
+
+```{r}
+#Hipóteses
+Hip1IPCA <- c("1=L(ipcavar, 1)+L(ipcavar,2)+L(ipcavar,3)+L(ipcavar,4)+L(ipcavar,5)")
+linearHypothesis(modeloARDL1,Hip1IPCA)
+```
+
+```{r}
+#Elasticidades
+#e_ipca <- modeloARDL1$coefficients[1]/(ipcavar_L)
+#e_ipca
+#e_e <- e_L/ipcavar_L
+#e_e
+```
+
